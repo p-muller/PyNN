@@ -82,7 +82,7 @@ class Network:
 
 
         if sim.rank() == 0:
-            print('w: %g' % self.w)
+            print('w: {}'.format(self.w))
 
         for target_layer in layers :
             for target_pop in pops :
@@ -100,7 +100,7 @@ class Network:
                 if thalamic_input:
                     # Thalamic inputs
                     if sim.rank() == 0 :
-                        print('creating thalamic connections to %s%s') % (target_layer, target_pop))
+                        print(('creating thalamic connections to %s%s') % (target_layer, target_pop))
                     C_thal = thal_params['C'][target_layer][target_pop]
                     n_target = N_full[target_layer][target_pop]
                     K_thal = round(np.log(1-C_thal)/np.log((n_target*thal_params['n_thal']-1.)/ \
