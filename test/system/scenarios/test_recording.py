@@ -3,7 +3,7 @@ import numpy
 import quantities as pq
 from nose.tools import assert_equal
 from pyNN.utility import assert_arrays_equal, assert_arrays_almost_equal, init_logging
-from registry import register
+from .registry import register
 
 
 @register(exclude=['pcsim', 'nemo'])
@@ -100,18 +100,38 @@ def issue259(sim):
     p.record('spikes')
     sim.run(10.0)
     spiketrains0 = p.get_data('spikes', clear=True).segments[0].spiketrains
-    print spiketrains0[0]
+    print(spiketrains0[0])
     sim.run(10.0)
     spiketrains1 = p.get_data('spikes', clear=True).segments[0].spiketrains
-    print spiketrains1[0]
+    print(spiketrains1[0])
     sim.run(10.0)
     spiketrains2 = p.get_data('spikes', clear=True).segments[0].spiketrains
-    print spiketrains2[0]
+    print(spiketrains2[0])
     sim.end()
 
     assert_arrays_almost_equal(spiketrains0[0], numpy.array([0.025])*pq.ms, 1e-17)
     assert_arrays_almost_equal(spiketrains1[0], numpy.array([10.025, 12.34])*pq.ms, 1e-17)
     assert_equal(spiketrains2[0].size, 0)
+
+
+@register()
+def test_sampling_interval(sim):
+    """
+    A test of the sampling_interval argument.
+    """
+    sim.setup(0.1)
+    p1 = sim.Population(3, sim.IF_cond_exp())
+    p2 = sim.Population(4, sim.IF_cond_exp())
+    p1.record('v', sampling_interval=1.0)
+    p2.record('v', sampling_interval=0.5)
+    sim.run(10.0)
+    d1 = p1.get_data().segments[0].analogsignalarrays[0]
+    d2 = p2.get_data().segments[0].analogsignalarrays[0]
+    assert_equal(d1.sampling_period, 1.0*pq.ms)
+    assert_equal(d1.shape, (11, 3))
+    assert_equal(d2.sampling_period, 0.5*pq.ms)
+    assert_equal(d2.shape, (21, 4))
+    sim.end()
 
 
 if __name__ == '__main__':
@@ -120,3 +140,4 @@ if __name__ == '__main__':
     test_reset_recording(sim)
     test_record_vm_and_gsyn_from_assembly(sim)
     issue259(sim)
+    test_sampling_interval(sim)

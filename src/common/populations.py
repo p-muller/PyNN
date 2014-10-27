@@ -13,6 +13,12 @@ import os
 import logging
 import operator
 import tempfile
+try:
+    basestring
+    reduce
+except NameError:
+    basestring = str
+    from functools import reduce
 from pyNN import random, recording, errors, standardmodels, core, space, descriptions
 from pyNN.models import BaseCellType
 from pyNN.parameters import ParameterSpace, LazyArray
@@ -150,7 +156,7 @@ class BasePopulation(object):
             p[2] is equivalent to p.__getitem__(2).
             p[3:6] is equivalent to p.__getitem__(slice(3, 6))
         """
-        if isinstance(index, int):
+        if isinstance(index, (int, numpy.integer)):
             return self.all_cells[index]
         elif isinstance(index, (slice, list, numpy.ndarray)):
             return self._get_view(index)
@@ -392,7 +398,7 @@ class BasePopulation(object):
         """Determine whether `variable` can be recorded from this population."""
         return self.celltype.can_record(variable)
 
-    def record(self, variables, to_file=None):
+    def record(self, variables, to_file=None, sampling_interval=None):
         """
         Record the specified variable or variables for all cells in the
         Population or view.
@@ -403,6 +409,9 @@ class BasePopulation(object):
 
         If specified, `to_file` should be a Neo IO instance and `write_data()`
         will be automatically called when `end()` is called.
+        
+        `sampling_interval` should be a value in milliseconds, and an integer
+        multiple of the simulation timestep.
         """
         if variables is None: # reset the list of things to record
                               # note that if record(None) is called on a view of a population
@@ -411,9 +420,9 @@ class BasePopulation(object):
         else:
             logger.debug("%s.record('%s')", self.label, variables)
             if self._record_filter is None:
-                self.recorder.record(variables, self.all_cells)
+                self.recorder.record(variables, self.all_cells, sampling_interval)
             else:
-                self.recorder.record(variables, self._record_filter)
+                self.recorder.record(variables, self._record_filter, sampling_interval)
         if isinstance(to_file, basestring):
             self.recorder.file = to_file
 
@@ -455,7 +464,7 @@ class BasePopulation(object):
         file as metadata.
         """
         logger.debug("Population %s is writing %s to %s [gather=%s, clear=%s]" % (self.label, variables, io, gather, clear))
-        self.recorder.write(variables, io, gather, self._record_filter, clear=clear, 
+        self.recorder.write(variables, io, gather, self._record_filter, clear=clear,
                             annotations=annotations)
 
     def get_data(self, variables='all', gather=True, clear=False):
@@ -683,7 +692,7 @@ class Population(BasePopulation):
 
     def _set_structure(self, structure):
         assert isinstance(structure, space.BaseStructure)
-        if structure != self._structure:
+        if self._structure is None or structure != self._structure:
             self._positions = None  # setting a new structure invalidates previously calculated positions
             self._structure = structure
     structure = property(fget=_get_structure, fset=_set_structure)
@@ -904,7 +913,7 @@ class Assembly(object):
         Create an Assembly of Populations and/or PopulationViews.
         """
         if kwargs:
-            assert kwargs.keys() == ['label']
+            assert list(kwargs.keys()) == ['label']
         self.populations = []
         for p in populations:
             self._insert(p)
@@ -1075,7 +1084,7 @@ class Assembly(object):
             boundaries.append(count)
         boundaries = numpy.array(boundaries, dtype=numpy.int)
 
-        if isinstance(index, int): # return an ID
+        if isinstance(index, (int, numpy.integer)): # return an ID
             pindex = boundaries[1:].searchsorted(index, side='right')
             return self.populations[pindex][index-boundaries[pindex]]
         elif isinstance(index, (slice, tuple, list, numpy.ndarray)):
@@ -1173,7 +1182,7 @@ class Assembly(object):
     def rset(self, parametername, rand_distr):
         self.set(parametername=rand_distr)
 
-    def record(self, variables, to_file=None):
+    def record(self, variables, to_file=None, sampling_interval=None):
         """
         Record the specified variable or variables for all cells in the Assembly.
 
@@ -1185,7 +1194,7 @@ class Assembly(object):
         will be automatically called when `end()` is called.
         """
         for p in self.populations:
-            p.record(variables, to_file)
+            p.record(variables, to_file, sampling_interval)
 
     @deprecated("record('v')")
     def record_v(self, to_file=True):
@@ -1228,7 +1237,7 @@ class Assembly(object):
             return self.positions[:,i]
         return gen
 
-    def get_data(self, variables='all', gather=True, clear=False):
+    def get_data(self, variables='all', gather=True, clear=False, annotations=None):
         """
         Return a Neo `Block` containing the data (spikes, state variables)
         recorded from the Assembly.
@@ -1266,6 +1275,8 @@ class Assembly(object):
             merged_block.merge(block)
         merged_block.name = name
         merged_block.description = description
+        if annotations:
+            merged_block.annotate(**annotations)
         return merged_block
 
     @deprecated("get_data('spikes')")
@@ -1306,7 +1317,7 @@ class Assembly(object):
                 pass
         return spike_counts
 
-    def write_data(self, io, variables='all', gather=True, clear=False):
+    def write_data(self, io, variables='all', gather=True, clear=False, annotations=None):
         """
         Write recorded data to file, using one of the file formats supported by
         Neo.
@@ -1331,7 +1342,7 @@ class Assembly(object):
             io.filename += '.%d' % self._simulator.state.mpi_rank
         logger.debug("Recorder is writing '%s' to file '%s' with gather=%s" % (
                                                variables, io.filename, gather))
-        data = self.get_data(variables, gather, clear)
+        data = self.get_data(variables, gather, clear, annotations)
         if self._simulator.state.mpi_rank == 0 or gather == False:
             logger.debug("Writing data to file %s" % io)
             io.write(data)

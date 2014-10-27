@@ -133,7 +133,7 @@ class Projection(common.Projection):
                                        listify(weights),
                                        listify(delays),
                                        self.nest_synapse_model)
-            except nest.NESTError, e:
+            except nest.NESTError as e:
                 raise errors.ConnectionError("%s. presynaptic_cells=%s, postsynaptic_cell=%s, weights=%s, delays=%s, synapse model='%s'" % (
                                              e, presynaptic_cells, postsynaptic_cell, weights, delays, self.nest_synapse_model))
         else:
@@ -294,6 +294,8 @@ class Projection(common.Projection):
             values = numpy.array(values)
             values[:, names.index('postsynaptic_index')] -= self.post.first_id
             values = values.tolist()
+        for i in xrange(len(values)):
+            values[i] = tuple(values[i])
         return values
 
     def _get_attributes_as_arrays(self, *names):

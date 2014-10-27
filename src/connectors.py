@@ -17,7 +17,15 @@ from pyNN.recording import files
 from pyNN.parameters import LazyArray
 from pyNN.standardmodels import StandardSynapseType
 import numpy
-from itertools import izip, repeat
+try:
+    from itertools import izip
+except ImportError:  #python3.x
+    izip = zip
+try:
+    basestring
+except NameError:
+    basestring = str
+from itertools import repeat
 import logging
 from copy import copy, deepcopy
 
@@ -165,13 +173,23 @@ class MapConnector(Connector):
             # `local`: boolean - does the post-synaptic neuron exist on this MPI node
             # `source_mask` - boolean numpy array, indicating which of the pre-synaptic neurons should be connected to,
             #                 or a single boolean, meaning connect to all/none of the pre-synaptic neurons
+            #                 It can also be an array of addresses
+            _proceed = False 
             if source_mask is True or source_mask.any():
+                _proceed = True
+            elif type(source_mask) == numpy.ndarray:
+                if source_mask.dtype == bool:
+                    if source_mask.any():
+                        _proceed = True
+                elif len(source_mask) > 0:
+                    _proceed = True
+            if _proceed:
                 # Convert from boolean to integer mask, if necessary
                 if source_mask is True:
                     source_mask = numpy.arange(projection.pre.size, dtype=int)
                 elif source_mask.dtype == bool:
                     source_mask = source_mask.nonzero()[0]
-
+            
                 # Evaluate the lazy arrays containing the synaptic parameters
                 connection_parameters = {}
                 for name, map in parameter_space.items():
@@ -191,7 +209,7 @@ class MapConnector(Connector):
 
                 if local:
                     # Connect the neurons
-                    #logger.debug("Connecting to %d from %s" % (col, source_mask))
+                    logger.debug("Connecting to %d from %s" % (col, source_mask))
                     projection._convergent_connect(source_mask, col, **connection_parameters)
                     if self.callback:
                         self.callback(count/projection.post.local_size)
@@ -321,7 +339,7 @@ class DistanceDependentProbabilityConnector(MapConnector):
             if isinstance(d_expression, str):
                 d = 0; assert 0 <= eval(d_expression), eval(d_expression)
                 d = 1e12; assert 0 <= eval(d_expression), eval(d_expression)
-        except ZeroDivisionError, err:
+        except ZeroDivisionError as err:
             raise ZeroDivisionError("Error in the distance expression %s. %s" % (d_expression, err))
         self.d_expression = d_expression
         self.allow_self_connections = allow_self_connections
