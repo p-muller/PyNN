@@ -109,7 +109,7 @@ class NESTConnectorMixin(object):
                     rng = NativeRNG(value.base_value)
 
                     for rng_name in rng.parameters.keys() :
-                        if rng_name =='distribution' or rng_name != 'weight' :
+                        if rng_name =='distribution' or name != 'weight' :
                             pval = rng.parameters[rng_name]
                         else :
                             pval = eval(NEST_RDIST_TRANSFORMATIONS[value.base_value.name][rng_name],rng.parameters)
