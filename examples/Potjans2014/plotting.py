@@ -11,7 +11,6 @@ def show_raster_bars(t_start, t_stop, n_rec, frac_to_plot, path):
     # Read out spikes for each population
     layer_list = ['L23','L4','L5','L6']
     pop_list = ['E','I'] 
-
     for i in range(8):
         layer = i/2
         pop = i%2
@@ -57,6 +56,7 @@ def show_raster_bars(t_start, t_stop, n_rec, frac_to_plot, path):
         num_neurons = frac_to_plot*np.unique(ids).size
         t_spikes = t_spikes[np.where(ids<num_neurons+id_count+1)[0]]
         ids = ids[np.where(ids<num_neurons+id_count+1)[0]]
+
         axarr[0].plot(t_spikes, ids, '.', color=color[pop])
         id_count = ids[-1]
 
@@ -74,3 +74,20 @@ def show_raster_bars(t_start, t_stop, n_rec, frac_to_plot, path):
 
     plt.savefig(path+'result.png')
 
+
+if __name__ == '__main__':
+    from sim_params import simulator_params, system_params
+    from network_params import *
+    n_rec = np.zeros((n_layers,n_pops_per_layer))
+    for layer, i in layers.items() :
+        for pop, j in pops.items() :
+            if record_fraction:
+
+                n_rec[i][j] = round(N_full[layer][pop]*N_scaling*frac_record_spikes)
+            else:
+                n_rec[i][j] = n_record
+            print n_rec
+    print N_full
+    print n_rec
+
+    show_raster_bars(raster_t_min, raster_t_max, n_rec, frac_to_plot,'./')
